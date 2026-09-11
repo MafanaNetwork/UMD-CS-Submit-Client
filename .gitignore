@@ -1,0 +1,17 @@
+# Gradle / IntelliJ build output
+.gradle/
+build/
+.intellijPlatform/
+out/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Never commit Marketplace secrets/certificates
+*.pem
+*.key
+*.p12
+*.jks
+chain.crt
