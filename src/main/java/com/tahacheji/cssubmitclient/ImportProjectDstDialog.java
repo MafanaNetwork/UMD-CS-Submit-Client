@@ -19,6 +19,7 @@
 package com.tahacheji.cssubmitclient;
 
 import com.intellij.ide.RecentProjectsManager;
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
@@ -46,8 +47,10 @@ public class ImportProjectDstDialog extends DialogWrapper {
         GridBagConstraints gbc = new GridBagConstraints();
         dstChooser = new TextFieldWithBrowseButton();
         dstChooser.setText(RecentProjectsManager.getInstance().getLastProjectCreationLocation());
-        dstChooser.addBrowseFolderListener("Select Destination Directory", null, null,
-                FileChooserDescriptorFactory.createSingleFolderDescriptor());
+        FileChooserDescriptor descriptor =
+                FileChooserDescriptorFactory.createSingleLocalFileDescriptor()
+                        .withTitle("Select Destination Directory");
+        dstChooser.addBrowseFolderListener(null, descriptor);
         JLabel label = new JLabel("Select Destination Directory:");
         gbc.gridx = 0; gbc.gridy = 0; gbc.anchor = GridBagConstraints.WEST;
         panel.add(label, gbc);

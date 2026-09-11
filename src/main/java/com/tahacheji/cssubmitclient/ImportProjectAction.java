@@ -52,7 +52,7 @@ public class ImportProjectAction extends AnAction {
                     "Please select a valid ZIP file. The selected file is either invalid or corrupted.",
                     "Invalid CS Project File Selected"
             );
-            this.actionPerformed(e);
+            //this.actionPerformed(e);
         }
     }
 }
