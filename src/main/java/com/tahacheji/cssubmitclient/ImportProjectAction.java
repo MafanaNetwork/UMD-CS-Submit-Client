@@ -24,9 +24,7 @@ import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
-import net.lingala.zip4j.ZipFile;
 import org.jetbrains.annotations.NotNull;
 
 public class ImportProjectAction extends AnAction {
@@ -41,18 +39,9 @@ public class ImportProjectAction extends AnAction {
         VirtualFile selectedFile = FileChooser.chooseFile(descriptor, project, null);
         if (selectedFile == null) return;
 
-        if (!selectedFile.isDirectory() && new ZipFile(selectedFile.getPath()).isValidZipFile()) {
-            ImportProjectDstDialog dstDialog = new ImportProjectDstDialog(project);
-            dstDialog.show();
-            if (!dstDialog.getDstPath().isBlank()) {
-                ImportProjectCore.startImport(selectedFile.getPath(), dstDialog.getDstPath());
-            }
-        } else {
-            Messages.showErrorDialog(
-                    "Please select a valid ZIP file. The selected file is either invalid or corrupted.",
-                    "Invalid CS Project File Selected"
-            );
-            //this.actionPerformed(e);
+        ImportProjectDstDialog dstDialog = new ImportProjectDstDialog(project);
+        if (dstDialog.showAndGet() && !dstDialog.getDstPath().isBlank()) {
+            ImportProjectCore.startImport(selectedFile.getPath(), dstDialog.getDstPath());
         }
     }
 }

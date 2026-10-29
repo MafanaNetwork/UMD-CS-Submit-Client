@@ -48,7 +48,7 @@ public class ImportProjectDstDialog extends DialogWrapper {
         dstChooser = new TextFieldWithBrowseButton();
         dstChooser.setText(RecentProjectsManager.getInstance().getLastProjectCreationLocation());
         FileChooserDescriptor descriptor =
-                FileChooserDescriptorFactory.createSingleLocalFileDescriptor()
+                FileChooserDescriptorFactory.createSingleFolderDescriptor()
                         .withTitle("Select Destination Directory");
         dstChooser.addBrowseFolderListener(null, descriptor);
         JLabel label = new JLabel("Select Destination Directory:");

@@ -21,13 +21,17 @@ package com.tahacheji.cssubmitclient;
 import com.intellij.ide.RecentProjectsManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectManager;
+import com.intellij.ide.impl.OpenProjectTask;
+import com.intellij.openapi.project.ex.ProjectManagerEx;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.Task;
+import org.jetbrains.annotations.NotNull;
 import com.intellij.openapi.projectRoots.ProjectJdkTable;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.Messages;
 import net.lingala.zip4j.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
 import net.lingala.zip4j.model.FileHeader;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -47,35 +51,54 @@ import java.nio.file.Path;
 
 public class ImportProjectCore {
     public static void startImport(String srcPath, String dstPath) {
-        try {
-            ZipFile projectArchive = new ZipFile(srcPath);
-            FileHeader fileHeader = projectArchive.getFileHeaders().get(0);
-            String rootFolder = fileHeader.getFileName().split("/")[0];
-            if (Files.exists(Path.of(dstPath + "/" + rootFolder))) {
-                throw new ImportProjectException("Project already exists at Destination");
+        // Do not bind the task to the old project: opening a project can dispose it.
+        new Task.Backgroundable(null, "Importing UMD CS Project", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try (ZipFile projectArchive = new ZipFile(srcPath)) {
+                    indicator.setIndeterminate(true);
+                    indicator.setText("Extracting project...");
+                    if (!projectArchive.isValidZipFile() || projectArchive.getFileHeaders().isEmpty()) {
+                        throw new ImportProjectException("Please select a valid, non-empty project ZIP file.");
+                    }
+                    FileHeader fileHeader = projectArchive.getFileHeaders().get(0);
+                    String rootFolder = fileHeader.getFileName().split("/")[0];
+                    Path destination = Path.of(dstPath).toAbsolutePath().normalize();
+                    Path projectRoot = destination.resolve(rootFolder).normalize();
+                    if (rootFolder.isBlank() || !projectRoot.startsWith(destination)
+                            || projectRoot.equals(destination)) {
+                        throw new ImportProjectException("Invalid project folder in ZIP file.");
+                    }
+                    if (Files.exists(projectRoot)) {
+                        throw new ImportProjectException("Project already exists at Destination");
+                    }
+                    projectArchive.extractAll(destination.toString());
+                    createModuleIML(projectRoot.toString(), rootFolder);
+                    createModuleXML(projectRoot.toString(), rootFolder);
+                    indicator.setText("Opening project...");
+                    // The Java API waits on this worker, leaving the UI thread free.
+                    // A new frame also avoids disposing the action's originating project.
+                    Project project = ProjectManagerEx.getInstanceEx().openProject(
+                            projectRoot, OpenProjectTask.build().withForceOpenInNewFrame(true));
+                    if (project == null) return; // Opening was cancelled by the user/platform.
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (project.isDisposed()) return;
+                        ApplicationManager.getApplication().runWriteAction(() -> {
+                            Sdk[] sdkTable = ProjectJdkTable.getInstance().getAllJdks();
+                            if (sdkTable.length > 0) {
+                                ProjectRootManager.getInstance(project).setProjectSdk(sdkTable[0]);
+                            }
+                        });
+                        RecentProjectsManager.getInstance().setLastProjectCreationLocation(dstPath);
+                    });
+                } catch (ProcessCanceledException ex) {
+                    throw ex;
+                } catch (Exception ex) {
+                    ApplicationManager.getApplication().invokeLater(() -> Messages.showErrorDialog(
+                            "Could not import project: " + ex.getMessage(), "Project Import Failed"));
+                }
             }
-            projectArchive.extractAll(dstPath);
-            importEclipseProject(dstPath + "/" + rootFolder, rootFolder);
-            RecentProjectsManager.getInstance().setLastProjectCreationLocation(dstPath);
-        } catch (ZipException ex) {
-            Messages.showErrorDialog("Failed to extract Project Archive: " + ex.getMessage(), "Project Import Failed");
-        } catch (ImportProjectException ex) {
-            Messages.showErrorDialog(ex.getMessage(), "Project Import Failed");
-        }
-    }
-
-    private static void importEclipseProject(String projectRoot, String projectName) throws ImportProjectException {
-        try {
-            createModuleIML(projectRoot, projectName);
-            createModuleXML(projectRoot, projectName);
-            Project project = ProjectManager.getInstance().loadAndOpenProject(projectRoot);
-            ApplicationManager.getApplication().runWriteAction(() -> {
-                Sdk[] sdkTable = ProjectJdkTable.getInstance().getAllJdks();
-                if (sdkTable.length > 0) ProjectRootManager.getInstance(project).setProjectSdk(sdkTable[0]);
-            });
-        } catch (Exception e) {
-            throw new ImportProjectException(e.getMessage());
-        }
+        }.queue();
     }
 
     public static void createModuleIML(String projectRoot, String moduleName)
