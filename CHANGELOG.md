@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2 - 2026-10-29
+
+- Import project freeze fix.
+
 ## 1.3.0 - 2026-09-11
 
 - Prepared the maintained fork for JetBrains Marketplace release.
